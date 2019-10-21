@@ -1,0 +1,12 @@
+#ifndef ZMDCOMMON_GLOBAL_H
+#define ZMDCOMMON_GLOBAL_H
+
+#include <QtCore/qglobal.h>
+
+#if defined(ZMDCOMMON_LIBRARY)
+#  define ZMDCOMMONSHARED_EXPORT Q_DECL_EXPORT
+#else
+#  define ZMDCOMMONSHARED_EXPORT Q_DECL_IMPORT
+#endif
+
+#endif // ZMDCOMMON_GLOBAL_H
