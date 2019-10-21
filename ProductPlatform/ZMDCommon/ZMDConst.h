@@ -5,8 +5,10 @@
 const int cPortClient_Server = 6001;
 const int cPortClient_Proxy = 6003;
 const int cPortServer_Proxy = 6004;
+const int cPortUDPBroadCast = 3333;
 
 const QString c_Ready = "Ready";
+const QString c_Separator = "|";
 
 // 消息类型
 enum MSGTYPE

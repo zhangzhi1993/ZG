@@ -24,8 +24,7 @@
 
 QString g_IP = "localhost";
 int g_WorkerCnt = 3;
-int g_TaskCnt = 10;
-int g_multiTaskCnt = 2;
+
 const int c_PipeLine = 5;
 
 void createWorker(QString uUID)
@@ -98,105 +97,7 @@ void createWorker(QString uUID)
     context.close();
 }
 
-void createClient(QString uUID, int nTaskCnt)
-{
-    QString uRID = ZMDUtils::refreshAddr(uUID);
-    std::string sUID = uUID.toStdString();
-    std::string sRID = uRID.toStdString();
-    qDebug() << "createClient" << uUID << uRID;
 
-    zmq::context_t context(1);
-
-    // 任务发起者：这是client端任务，它会连接至server，每秒发送一次请求，同时收集和打印应答消息
-    zmq::socket_t sckProducer(context, ZMQ_DEALER);
-//    ZMDCommon::setHighWaterLevel(&sckProducer, 1);
-    sckProducer.setsockopt(ZMQ_IDENTITY, sUID.data(), sUID.size());
-    sckProducer.connect(QString("tcp://%1:%2").arg(g_IP).arg(cPortClient_Proxy).toStdString());
-
-    // 用于和Worker交互信息
-    zmq::socket_t sckExchanger(context, ZMQ_DEALER);
-//    ZMDCommon::setHighWaterLevel(&sckExchanger, 1);
-    sckExchanger.setsockopt(ZMQ_IDENTITY, sRID.data(), sRID.size());
-    sckExchanger.connect(QString("tcp://%1:%2").arg(g_IP).arg(cPortClient_Server).toStdString());
-
-    ZMDUtils::printHighWaterLevel(&sckProducer);
-    ZMDUtils::printHighWaterLevel(&sckExchanger);
-
-    zmq_pollitem_t items [] = {
-        { sckProducer,  0, ZMQ_POLLIN, 0 },
-        { sckExchanger, 0, ZMQ_POLLIN, 0 }
-    };
-
-    int nSendSeq = 0;
-
-    // 能一次发送的消息
-    for (int i = 0; i < nTaskCnt-g_multiTaskCnt; i++)
-    {
-        // 发送任务给处理器
-        ZMDUtils::sendmore(&sckProducer, "");
-        MTMessage msSend = {mtTask, uRID, "", 1, 0, infString, QString("send work from %1 for info:%2")
-                            .arg(ZMDUtils::lastAddr(uUID)).arg(++nSendSeq).toLocal8Bit()}; //注意这里的srcAddr传的是sckExchanger的sRID
-        bool bRes = ZMDUtils::sendMsg(&sckProducer, msSend);
-//        qDebug() << QStringLiteral("发送任务") << msSend.toString() << bRes;
-    }
-
-    // 需要多次发送的消息：首先发送一条Head信息并接收返回信息来确定Worker的地址，然后对方通过Query来查询之后的信息
-    for (int i = 0; i < g_multiTaskCnt; i++)
-    {
-        nSendSeq++;
-        int nChunckCnt = 10;
-        ZMDUtils::sendmore(&sckProducer, "");
-        MTMessage msSend = {mtTask, uRID, "", nChunckCnt, 0, infString, QString("send work from %1 for info:%2")
-                            .arg(ZMDUtils::lastAddr(uUID)).arg(nSendSeq).toLocal8Bit()};
-        ZMDUtils::sendMsg(&sckProducer, msSend);
-    }
-
-
-    int nResultCnt = 0;
-    while (true)
-    {
-        zmq_poll (items, 2, -1);
-        if (items [0].revents & ZMQ_POLLIN) // 不可能收到消息
-        {
-            qDebug() << QStringLiteral("%1出现了错误").arg(ZMDUtils::lastAddr(uUID));
-        }
-        if (items [1].revents & ZMQ_POLLIN)
-        {
-            ZMDUtils::resv(&sckExchanger); // 第一帧是空
-            MTMessage mtMsg = ZMDUtils::resvMsg(&sckExchanger);
-//            qDebug() << QStringLiteral("返回信息") << mtMsg.toString();
-            QString srcAddr = mtMsg.srcAddr;
-            switch (mtMsg.mtType) {
-            case mtResult:
-                nResultCnt++;
-                qDebug() << QStringLiteral("接收结果") << ZMDUtils::lastAddr(uRID) << ZMDUtils::lastAddr(srcAddr) << mtMsg.info ;
-                break;
-            case mtQuery:
-                {
-                    qDebug() << QStringLiteral("接收询问") << ZMDUtils::lastAddr(uRID) << ZMDUtils::lastAddr(srcAddr) << mtMsg.info << mtMsg.sequence;
-                    MTMessage msSend = {mtResult, uRID, srcAddr, mtMsg.total, mtMsg.sequence, infString,
-                                        QString("send queryRes from %1 to %2 for info:%3_%4")
-                                        .arg(ZMDUtils::lastAddr(uRID)).arg(ZMDUtils::lastAddr(srcAddr)).arg(++nSendSeq)
-                                        .arg(mtMsg.sequence).toLocal8Bit()};
-                    ZMDUtils::sendmore(&sckExchanger, "");
-                    ZMDUtils::sendMsg(&sckExchanger, msSend);
-                }
-                break;
-            default:
-                break;
-            }
-        }
-        if (nResultCnt == nTaskCnt)
-        {
-            break;
-        }
-    }
-
-    qDebug() << QStringLiteral("完成运算");
-    sckProducer.close();
-    sckExchanger.close();
-    context.close();
-}
 
 
 int main(int argc, char *argv[])

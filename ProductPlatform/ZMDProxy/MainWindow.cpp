@@ -4,17 +4,18 @@
 #include <QHostAddress>
 #include <QNetworkAddressEntry>
 #include <QQueue>
-#include "czmq.h"
 #include <QDebug>
-#include <iostream>
-#include <event2/event.h>
-#include <event2/bufferevent.h>
-#include <event2/event_struct.h>
+#include <QUuid>
 #include <QString>
+#include <iostream>
+#include "czmq.h"
 #include "ZMDUtils.h"
 #include "MTMessage.h"
 #include "zhelpers.h"
 #include "ZMDConst.h"
+
+//const int c_RouterProxyLoop = -1;
+const int c_RouterProxyLoop = 1000;
 
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
@@ -38,7 +39,7 @@ void MainWindow::doBroadCast()
 {
     /* 单播和广播的区别在第二个参数 */
     QList<QNetworkInterface> networkinterfaces = QNetworkInterface::allInterfaces();
-    int i = 0;
+
     foreach (QNetworkInterface interface, networkinterfaces)
     {
         foreach (QNetworkAddressEntry entry, interface.addressEntries())
@@ -49,8 +50,10 @@ void MainWindow::doBroadCast()
                 && entry.ip().protocol() == QAbstractSocket::IPv4Protocol
                 )
             {
-                QString ba = QString("%1").arg(entry.ip().toString());
-                us->writeDatagram(ba.toStdString().data(), broadcastAddress, 3333);  // UDP 发送数据
+                QString ba = QString("%1%2%3").arg(entry.ip().toString())
+                        .arg(c_Separator).arg(QUuid::createUuid().toString());
+                qDebug() << ba;
+                us->writeDatagram(ba.toStdString().data(), broadcastAddress, cPortUDPBroadCast);  // UDP 发送数据
             }
         }
      }
@@ -88,7 +91,9 @@ void MainWindow::createRouterProxy()
 
     while (true)
     {
-        zmq_poll (items, 3, -1); //最好用这个
+        doBroadCast();
+
+        zmq_poll (items, 3, c_RouterProxyLoop); //最好用这个
 
         if (items [0].revents & ZMQ_POLLIN) // 对工人身份排队以用于负载均衡，并转发后端到前端的消息
         {

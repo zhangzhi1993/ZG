@@ -5,6 +5,8 @@
 #-------------------------------------------------
 
 QT       += core gui network
+CONFIG += console
+CONFIG -= app_bundle
 
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
@@ -23,6 +25,21 @@ DEFINES += QT_DEPRECATED_WARNINGS
 # You can also select to disable deprecated APIs only up to a certain version of Qt.
 #DEFINES += QT_DISABLE_DEPRECATED_BEFORE=0x060000    # disables all the APIs deprecated before Qt 6.0.0
 
+DEFINES += WIN32_LEAN_AND_MEAN
+
+QMAKE_CXXFLAGS_RELEASE += /NODEFAULTLIB:"libcmt.lib"
+QMAKE_LFLAGS_RELEASE += /DEBUG
+
+include($(GLDRS)/Glodon/shared/zeroMQ.pri)
+include($(GLDRS)/Glodon/shared/libevent.pri)
+include($(GLDRS)/Glodon/shared/GEPEngine.pri)
+include($(GLDRS)/Glodon/shared/GLDStaticLib.pri)
+include($(GLDRS)/Glodon/shared/GSPStaticLib.pri)
+include($(GLDRS)/Glodon/shared/VLD.pri)
+include($(GLDRS)/Glodon/shared/GSCRSARefGLDStaticLib.pri)
+include($(GLDRS)/Glodon/shared/QtitanRibbon.pri)
+include($(GLDRS)/Glodon/shared/GLDXLS.pri)
+include(../ZMDCommon/ZMDCommon.pri)
 
 SOURCES += \
         main.cpp \

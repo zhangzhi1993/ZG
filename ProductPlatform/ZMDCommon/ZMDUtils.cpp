@@ -103,6 +103,19 @@ bool ZMDUtils::sendByteArr(zmq::socket_t *socket, QByteArray msg)
     return socket->send(request);
 }
 
+bool ZMDUtils::tryConnect(zmq::socket_t *socket, QString addr)
+{
+    try
+    {
+        socket->connect(addr.toStdString());
+        return true;
+    }
+    catch(...)
+    {
+        return false;
+    }
+}
+
 void ZMDUtils::printHighWaterLevel(zmq::socket_t *socket)
 {
     int highRcvWaterLevel = 0;

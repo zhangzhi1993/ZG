@@ -23,6 +23,7 @@ public:
     static void setHighWaterLevel(zmq::socket_t *socket, int highWaterLevel);
     static QByteArray resvByteArr(zmq::socket_t *socket);
     static bool sendByteArr(zmq::socket_t *socket, QByteArray msg);
+    static bool tryConnect(zmq::socket_t *socket, QString addr);
 };
 
 #endif // ZMDUTILS_H
