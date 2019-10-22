@@ -1,6 +1,4 @@
-QT += core
-QT -= gui
-QT += concurrent
+QT       += core gui network
 
 TARGET = ZMDWorker
 CONFIG += console
@@ -27,9 +25,14 @@ include($(GLDRS)/Glodon/shared/GLDXLS.pri)
 include(../ZMDCommon/ZMDCommon.pri)
 
 SOURCES += main.cpp \
+    MainWindow.cpp
 
 
 
-HEADERS +=
+HEADERS += \
+    MainWindow.h
+
+FORMS += \
+    MainWindow.ui
 
 

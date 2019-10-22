@@ -19,17 +19,34 @@
 
 const int c_Retry = 10;
 const int c_Sleep = 1000;
-int g_TaskCnt = 10;
-int g_multiTaskCnt = 2;
 
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
     ui(new Ui::MainWindow),
-    aButton(NULL)
+    aButton(NULL),
+    m_TaskCnt(10),
+    m_multiTaskCnt(2)
 {
     ui->setupUi(this);
     us = new QUdpSocket;
-    us->bind(cPortUDPBroadCast, QUdpSocket::ShareAddress);
+    bool bConn = false;
+    int nPortUDPBroadCast;
+    foreach (nPortUDPBroadCast, cPortUDPBroadCasts) {
+        if (us->bind(nPortUDPBroadCast, QUdpSocket::ShareAddress))
+        {
+            bConn = true;
+            break;
+        }
+    }
+    if (!bConn)
+    {
+        qDebug() << QStringLiteral("连接广播端口失败");
+        return;
+    }
+    else
+    {
+        qDebug() << QStringLiteral("成功连接广播端口 %1").arg(nPortUDPBroadCast);
+    }
     connect(us, SIGNAL(readyRead()), this, SLOT(read_msg()));
 
     QWidget *centerWindow = new QWidget;
@@ -48,6 +65,12 @@ MainWindow::~MainWindow()
     delete ui;
     delete us;
     delete aButton;
+}
+
+void MainWindow::setTaskCnt(int taskCnt, int multiTaskCnt)
+{
+    m_TaskCnt = taskCnt;
+    m_multiTaskCnt = multiTaskCnt;
 }
 
 void MainWindow::read_msg()
@@ -84,7 +107,7 @@ void MainWindow::createClient()
 //    ZMDCommon::setHighWaterLevel(&sckExchanger, 1);
     sckExchanger.setsockopt(ZMQ_IDENTITY, sRID.data(), sRID.size());
 
-    int nRetry = c_Retry;
+
     while(true)
     {
         if (proxAddrs.empty())
@@ -92,12 +115,12 @@ void MainWindow::createClient()
             qDebug() << QStringLiteral("没有可用的代理！！！");
             return;
         }
-        nRetry = c_Retry;
         QString sIP = proxAddrs.dequeue();
         bool bConn1 = ZMDUtils::tryConnect(&sckProducer, QString("tcp://%1:%2").arg(sIP).arg(cPortClient_Proxy));
         bool bConn2 = ZMDUtils::tryConnect(&sckExchanger, QString("tcp://%1:%2").arg(sIP).arg(cPortClient_Server));
         if (bConn1 && bConn2)
         {
+            qDebug() << QStringLiteral("成功连接到代理 %1").arg(sIP);
             break;
         }
         else
@@ -118,7 +141,7 @@ void MainWindow::createClient()
     int nSendSeq = 0;
 
     // 能一次发送的消息
-    for (int i = 0; i < g_TaskCnt-g_multiTaskCnt; i++)
+    for (int i = 0; i < m_TaskCnt-m_multiTaskCnt; i++)
     {
         // 发送任务给处理器
         ZMDUtils::sendmore(&sckProducer, "");
@@ -129,7 +152,7 @@ void MainWindow::createClient()
     }
 
     // 需要多次发送的消息：首先发送一条Head信息并接收返回信息来确定Worker的地址，然后对方通过Query来查询之后的信息
-    for (int i = 0; i < g_multiTaskCnt; i++)
+    for (int i = 0; i < m_multiTaskCnt; i++)
     {
         nSendSeq++;
         int nChunckCnt = 10;
@@ -174,7 +197,7 @@ void MainWindow::createClient()
                 break;
             }
         }
-        if (nResultCnt == g_TaskCnt)
+        if (nResultCnt == m_TaskCnt)
         {
             break;
         }

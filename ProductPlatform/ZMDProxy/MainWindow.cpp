@@ -7,6 +7,7 @@
 #include <QDebug>
 #include <QUuid>
 #include <QString>
+#include <QTime>
 #include <iostream>
 #include "czmq.h"
 #include "ZMDUtils.h"
@@ -16,6 +17,7 @@
 
 //const int c_RouterProxyLoop = -1;
 const int c_RouterProxyLoop = 1000;
+const int c_BroadCastLoop = 1000;
 
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
@@ -53,7 +55,9 @@ void MainWindow::doBroadCast()
                 QString ba = QString("%1%2%3").arg(entry.ip().toString())
                         .arg(c_Separator).arg(QUuid::createUuid().toString());
                 qDebug() << ba;
-                us->writeDatagram(ba.toStdString().data(), broadcastAddress, cPortUDPBroadCast);  // UDP 发送数据
+                foreach (int nPortUDPBroadCast, cPortUDPBroadCasts) {
+                    us->writeDatagram(ba.toStdString().data(), broadcastAddress, nPortUDPBroadCast);  // UDP 发送数据
+                }
             }
         }
      }
@@ -89,9 +93,16 @@ void MainWindow::createRouterProxy()
     QQueue<QString> sWorkersList;
     int nLastWorkersCnt = 0;
 
+    QTime  lastBroadCast = QTime::currentTime().addMSecs(c_BroadCastLoop);
+    doBroadCast();
+
     while (true)
     {
-        doBroadCast();
+        if (QTime::currentTime() >= lastBroadCast)
+        {
+            doBroadCast();
+            lastBroadCast = QTime::currentTime().addMSecs(c_BroadCastLoop);
+        }
 
         zmq_poll (items, 3, c_RouterProxyLoop); //最好用这个
 

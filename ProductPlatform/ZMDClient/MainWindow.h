@@ -18,6 +18,7 @@ class MainWindow : public QMainWindow
 public:
     explicit MainWindow(QWidget *parent = 0);
     ~MainWindow();
+    void setTaskCnt(int taskCnt, int multiTaskCnt);
 
 public slots:
     void read_msg();
@@ -28,6 +29,8 @@ private:
     QUdpSocket *us;
     QPushButton *aButton;
     QQueue<QString> proxAddrs;
+    int m_TaskCnt;
+    int m_multiTaskCnt;
 };
 
 #endif // MAINWINDOW_H
