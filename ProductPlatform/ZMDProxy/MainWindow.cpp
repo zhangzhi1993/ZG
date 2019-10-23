@@ -28,7 +28,6 @@ MainWindow::MainWindow(QWidget *parent) :
     us = new QUdpSocket;
     abutton = new QPushButton;
     this->setCentralWidget(abutton);
-    connect(abutton, SIGNAL(clicked(bool)), this, SLOT(doBroadCast()));
 }
 
 MainWindow::~MainWindow()
@@ -37,7 +36,7 @@ MainWindow::~MainWindow()
     delete us;
 }
 
-void MainWindow::doBroadCast()
+void MainWindow::doBroadCast(QList<int> sPortUDPBroadCasts)
 {
     /* 单播和广播的区别在第二个参数 */
     QList<QNetworkInterface> networkinterfaces = QNetworkInterface::allInterfaces();
@@ -54,8 +53,8 @@ void MainWindow::doBroadCast()
             {
                 QString ba = QString("%1%2%3").arg(entry.ip().toString())
                         .arg(c_Separator).arg(QUuid::createUuid().toString());
-                qDebug() << ba;
-                foreach (int nPortUDPBroadCast, cPortUDPBroadCasts) {
+                qDebug() << ba << sPortUDPBroadCasts;
+                foreach (int nPortUDPBroadCast, sPortUDPBroadCasts) {
                     us->writeDatagram(ba.toStdString().data(), broadcastAddress, nPortUDPBroadCast);  // UDP 发送数据
                 }
             }
@@ -94,13 +93,17 @@ void MainWindow::createRouterProxy()
     int nLastWorkersCnt = 0;
 
     QTime  lastBroadCast = QTime::currentTime().addMSecs(c_BroadCastLoop);
-    doBroadCast();
+    doBroadCast(cWorkerPortUDPBroadCasts);
 
     while (true)
     {
         if (QTime::currentTime() >= lastBroadCast)
         {
-            doBroadCast();
+            doBroadCast(cWorkerPortUDPBroadCasts);
+            if (!sWorkersList.isEmpty())
+            {
+                doBroadCast(cClientPortUDPBroadCasts);
+            }
             lastBroadCast = QTime::currentTime().addMSecs(c_BroadCastLoop);
         }
 

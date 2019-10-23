@@ -19,7 +19,7 @@ public:
 
     void createRouterProxy();
 private slots:
-    void doBroadCast();
+    void doBroadCast(QList<int> sPortUDPBroadCasts);
 
 private:
     Ui::MainWindow *ui;

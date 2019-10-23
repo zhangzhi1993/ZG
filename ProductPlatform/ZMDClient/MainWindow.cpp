@@ -31,7 +31,7 @@ MainWindow::MainWindow(QWidget *parent) :
     us = new QUdpSocket;
     bool bConn = false;
     int nPortUDPBroadCast;
-    foreach (nPortUDPBroadCast, cPortUDPBroadCasts) {
+    foreach (nPortUDPBroadCast, cClientPortUDPBroadCasts) {
         if (us->bind(nPortUDPBroadCast, QUdpSocket::ShareAddress))
         {
             bConn = true;
