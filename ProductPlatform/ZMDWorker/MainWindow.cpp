@@ -20,6 +20,8 @@
 const int c_Retry = 10;
 const int c_Sleep = 1000;
 const int c_PipeLine = 5;
+const int c_DealerWorkerLoop = 1000;
+const int c_ExpiredLoop = c_DealerWorkerLoop * 10;
 
 
 MainWindow::MainWindow(QWidget *parent) :
@@ -83,7 +85,6 @@ void MainWindow::read_msg()
 
 void MainWindow::createWorker()
 {
-//    while (1)
     if (!bInWorking)
     {
         bInWorking = true;
@@ -100,7 +101,6 @@ void MainWindow::createWorker()
         }
         else
         {
-//            continue;
             bInWorking = false;
             return;
         }
@@ -113,6 +113,7 @@ void MainWindow::createWorker()
         zmq::socket_t sckConsumer (context, ZMQ_DEALER);
         sckConsumer.setsockopt(ZMQ_IDENTITY, sUID.data(), sUID.size());
 
+        QString sIP;
         while(true)
         {
             if (proxAddrs.empty())
@@ -120,16 +121,12 @@ void MainWindow::createWorker()
                 qDebug() << QStringLiteral("没有可用的代理！！！");
                 return;
             }
-            QString sIP = proxAddrs.dequeue();
+            sIP = proxAddrs.dequeue();
             bool bConn = ZMDUtils::tryConnect(&sckConsumer, QString("tcp://%1:%2").arg(sIP).arg(cPortServer_Proxy));
             if (bConn)
             {
                 qDebug() << QStringLiteral("成功连接到代理 %1").arg(sIP);
                 break;
-            }
-            else
-            {
-                sckConsumer.disconnect(QString("tcp://%1:%2").arg(sIP).arg(cPortServer_Proxy).toStdString());
             }
         }
 
@@ -137,16 +134,48 @@ void MainWindow::createWorker()
 //        qDebug() << "createWorker" << uUID << ++nCnt;
 
         // 告诉代理已经准备好了
-        ZMDUtils::send(&sckConsumer, c_Ready);
+        ZMDUtils::send(&sckConsumer, QString("%1%2%3").arg(c_Ready).arg(c_Separator).arg(sIP));
 
-        // 获取请求
-        MTMessage mtMsg = ZMDUtils::resvMsg(&sckConsumer);
+        zmq_pollitem_t items [] = {
+            { sckConsumer, 0, ZMQ_POLLIN, 0 }
+        };
+
+        QTime nextRestart = QTime::currentTime().addMSecs(c_ExpiredLoop);
+        MTMessage mtMsg;
+
+        while (true)
+        {
+            zmq_poll (items, 1, c_DealerWorkerLoop);
+            if (QTime::currentTime() >= nextRestart)
+            {
+                ZMDUtils::send(&sckConsumer, QString("%1%2%3").arg(c_UnUsed).arg(c_Separator).arg(sIP));
+                nextRestart = QTime::currentTime().addMSecs(c_ExpiredLoop);
+            }
+
+            if (items [0].revents & ZMQ_POLLIN)
+            {
+                QString sReady = ZMDUtils::resv(&sckConsumer);
+                if (c_Delete == sReady)
+                {
+                    sckConsumer.disconnect(QString("tcp://%1:%2").arg(sIP).arg(cPortServer_Proxy).toStdString());
+                    bInWorking = false;
+                    return;
+                }
+                else
+                {
+                    // 获取请求
+                    mtMsg = ZMDUtils::resvMsg(&sckConsumer);
+                    break;
+                }
+            }
+        }
+
+        qDebug() << QStringLiteral("接收任务") << mtMsg.toString();
         QString srcAddr = mtMsg.srcAddr;
 
         int nSleep = qrand() % 100;
         Sleep(nSleep); // 处理任务
 
-//        qDebug() << QStringLiteral("接收任务") << mtMsg.toString();
         QString sSrcInfoSeq = QString(mtMsg.info).split(" ").last(); //记录测试client的任务序号
 
         // 发送询问消息
@@ -173,6 +202,7 @@ void MainWindow::createWorker()
             }
 
             //接收询问返回消息
+            ZMDUtils::resv(&sckConsumer); // 空帧
             MTMessage msQuery = ZMDUtils::resvMsg(&sckConsumer);
             srcAddr = msQuery.srcAddr;
             nYetSum++;

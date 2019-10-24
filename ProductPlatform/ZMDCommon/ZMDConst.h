@@ -12,6 +12,8 @@ const QList<int> cWorkerPortUDPBroadCasts = QList<int>() << 3330 << 3331 << 3332
 const QList<int> cClientPortUDPBroadCasts = QList<int>() << 5550 << 5551 << 5552 << 5553 << 5554 << 5555 << 5556;
 
 const QString c_Ready = "Ready";
+const QString c_UnUsed = "UnUsed";
+const QString c_Delete = "Delete";
 const QString c_Separator = "|";
 
 // 消息类型
