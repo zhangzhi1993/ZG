@@ -21,7 +21,7 @@ const int c_Retry = 10;
 const int c_Sleep = 1000;
 const int c_PipeLine = 5;
 const int c_DealerWorkerLoop = 1000;
-const int c_ExpiredLoop = c_DealerWorkerLoop * 10;
+const int c_ExpiredLoop = c_DealerWorkerLoop * 1;
 
 
 MainWindow::MainWindow(QWidget *parent) :
@@ -142,7 +142,7 @@ void MainWindow::createWorker()
 
         QTime nextRestart = QTime::currentTime().addMSecs(c_ExpiredLoop);
         MTMessage mtMsg;
-
+        int nDecRetry = 0;
         while (true)
         {
             zmq_poll (items, 1, c_DealerWorkerLoop);
@@ -150,6 +150,13 @@ void MainWindow::createWorker()
             {
                 ZMDUtils::send(&sckConsumer, QString("%1%2%3").arg(c_UnUsed).arg(c_Separator).arg(sIP));
                 nextRestart = QTime::currentTime().addMSecs(c_ExpiredLoop);
+                nDecRetry++;
+                if (nDecRetry >= c_Retry)
+                {
+                    sckConsumer.disconnect(QString("tcp://%1:%2").arg(sIP).arg(cPortServer_Proxy).toStdString());
+                    bInWorking = false;
+                    return;
+                }
             }
 
             if (items [0].revents & ZMQ_POLLIN)
