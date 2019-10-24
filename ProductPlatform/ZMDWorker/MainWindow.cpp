@@ -153,6 +153,7 @@ void MainWindow::createWorker()
                 nDecRetry++;
                 if (nDecRetry >= c_Retry)
                 {
+                    qDebug() << QStringLiteral("删除超时Worker") << uUID;
                     sckConsumer.disconnect(QString("tcp://%1:%2").arg(sIP).arg(cPortServer_Proxy).toStdString());
                     bInWorking = false;
                     return;
@@ -195,7 +196,7 @@ void MainWindow::createWorker()
             while (nCredit)
             {
                 bool bRes = ZMDUtils::sendmore(&sckConsumer, ""); // 一个空帧，用于代理判断Worker的消息类型
-                MTMessage msSend = {mtQuery, uUID, srcAddr, mtMsg.total, nOffset++, infString,
+                MTMessage msSend = {mtQuery, uUID, 0, srcAddr, 0, mtMsg.total, nOffset++, infString,
                                     QString("send queryInfo to %1 from %2 for %3")
                                     .arg(ZMDUtils::lastAddr(srcAddr)).arg(ZMDUtils::lastAddr(uUID)).arg(sSrcInfoSeq).toLocal8Bit()};
                 bRes = bRes && ZMDUtils::sendMsg(&sckConsumer, msSend);
@@ -218,7 +219,7 @@ void MainWindow::createWorker()
 
         // 发送处理结果
         bool bRes = ZMDUtils::sendmore(&sckConsumer, ""); // 一个空帧，用于代理判断Worker的消息类型
-        MTMessage msSend = {mtResult, uUID, srcAddr, 1, 0, infString, QString("send result to %1 from %2 for %3")
+        MTMessage msSend = {mtResult, uUID, 0, srcAddr, mtMsg.synNo, 1, 0, infString, QString("send result to %1 from %2 for %3")
                             .arg(ZMDUtils::lastAddr(srcAddr)).arg(ZMDUtils::lastAddr(uUID)).arg(sSrcInfoSeq).toLocal8Bit()};
         bRes = bRes && ZMDUtils::sendMsg(&sckConsumer, msSend);
         qDebug() << QStringLiteral("发送结果") << msSend.toString() << bRes;

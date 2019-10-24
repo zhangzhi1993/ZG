@@ -12,7 +12,6 @@
 #include <QPushButton>
 #include <iostream>
 #include "czmq.h"
-#include "ZMDUtils.h"
 #include "MTMessage.h"
 #include "zhelpers.h"
 #include "ZMDConst.h"
@@ -140,13 +139,17 @@ void MainWindow::createClient()
 
     int nSendSeq = 0;
 
+    QMap<int, MTMessage> lstTasks; //需要发送的任务
+
     // 能一次发送的消息
     for (int i = 0; i < m_TaskCnt-m_multiTaskCnt; i++)
     {
+        ++nSendSeq;
         // 发送任务给处理器
         ZMDUtils::sendmore(&sckProducer, "");
-        MTMessage msSend = {mtTask, uRID, "", 1, 0, infString, QString("send work from %1 for info:%2")
-                            .arg(ZMDUtils::lastAddr(uUID)).arg(++nSendSeq).toLocal8Bit()}; //注意这里的srcAddr传的是sckExchanger的sRID
+        MTMessage msSend = {mtTask, uRID, nSendSeq, "", 0, 1, 0, infString, QString("send work from %1 for info:%2")
+                            .arg(ZMDUtils::lastAddr(uUID)).arg(nSendSeq).toLocal8Bit()}; //注意这里的srcAddr传的是sckExchanger的sRID
+        lstTasks.insert(nSendSeq, msSend);
         bool bRes = ZMDUtils::sendMsg(&sckProducer, msSend);
         qDebug() << QStringLiteral("发送任务") << msSend.toString() << bRes;
     }
@@ -157,8 +160,9 @@ void MainWindow::createClient()
         nSendSeq++;
         int nChunckCnt = 10;
         ZMDUtils::sendmore(&sckProducer, "");
-        MTMessage msSend = {mtTask, uRID, "", nChunckCnt, 0, infString, QString("send work from %1 for info:%2")
+        MTMessage msSend = {mtTask, uRID, nSendSeq, "", 0, nChunckCnt, 0, infString, QString("send work from %1 for info:%2")
                             .arg(ZMDUtils::lastAddr(uUID)).arg(nSendSeq).toLocal8Bit()};
+        lstTasks.insert(nSendSeq, msSend);
         ZMDUtils::sendMsg(&sckProducer, msSend);
     }
 
@@ -180,14 +184,20 @@ void MainWindow::createClient()
             switch (mtMsg.mtType) {
             case mtResult:
                 nResultCnt++;
-                qDebug() << QStringLiteral("接收结果") << ZMDUtils::lastAddr(uRID) << ZMDUtils::lastAddr(srcAddr) << mtMsg.info ;
+                if (lstTasks.keys().contains(mtMsg.ackNo))
+                {
+                    qDebug() << QStringLiteral("接收结果") << ZMDUtils::lastAddr(uRID) << ZMDUtils::lastAddr(srcAddr) << mtMsg.info ;
+                    lstTasks.remove(mtMsg.ackNo);
+                    reSendInfo(&sckProducer, lstTasks, mtMsg.ackNo);
+                }
                 break;
             case mtQuery:
                 {
+                    ++nSendSeq;
                     qDebug() << QStringLiteral("接收询问") << ZMDUtils::lastAddr(uRID) << ZMDUtils::lastAddr(srcAddr) << mtMsg.info << mtMsg.sequence;
-                    MTMessage msSend = {mtResult, uRID, srcAddr, mtMsg.total, mtMsg.sequence, infString,
+                    MTMessage msSend = {mtResult, uRID, nSendSeq, srcAddr, 0, mtMsg.total, mtMsg.sequence, infString,
                                         QString("send queryRes from %1 to %2 for info:%3_%4")
-                                        .arg(ZMDUtils::lastAddr(uRID)).arg(ZMDUtils::lastAddr(srcAddr)).arg(++nSendSeq)
+                                        .arg(ZMDUtils::lastAddr(uRID)).arg(ZMDUtils::lastAddr(srcAddr)).arg(nSendSeq)
                                         .arg(mtMsg.sequence).toLocal8Bit()};
                     ZMDUtils::sendmore(&sckExchanger, "");
                     ZMDUtils::sendMsg(&sckExchanger, msSend);
@@ -207,4 +217,19 @@ void MainWindow::createClient()
     sckProducer.close();
     sckExchanger.close();
     context.close();
+}
+
+void MainWindow::reSendInfo(zmq::socket_t *socket, const QMap<int, MTMessage> &lstTasks, int revNo)
+{
+    QList<int> lstKeys = lstTasks.keys();
+    for (int i = 0; i < lstKeys.count(); i++)
+    {
+        if (lstKeys.at(i) < revNo)
+        {
+            ZMDUtils::sendmore(socket, "");
+            MTMessage msSend = lstTasks.value(lstKeys.at(i));
+            bool bRes = ZMDUtils::sendMsg(socket, msSend);
+            qDebug() << QStringLiteral("重新发送任务") << msSend.toString() << bRes;
+        }
+    }
 }

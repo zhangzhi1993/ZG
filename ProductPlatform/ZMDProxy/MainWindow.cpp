@@ -124,7 +124,7 @@ void MainWindow::createRouterProxy()
             }
             else if (sReady == c_UnUsed)
             {
-//                qDebug() << QStringLiteral("³¢ÊÔÉ¾³ý") << srcAddr;
+//                qDebug() << QStringLiteral("³¢ÊÔÉ¾³ý³¬Ê±Worker") << srcAddr;
                 if (sWorkersList.removeOne(srcAddr)) //·¢ËÍÈ·ÈÏÉ¾³ýµÄÐÅºÅ
                 {
                     // ·â×°ÐÅ·â
@@ -169,7 +169,7 @@ void MainWindow::createRouterProxy()
             MTMessage msResv = ZMDUtils::resvMsg(&pFrontSocket2);
             QString dstAddr = sWorkersList.dequeue();
             msResv.dstAddr = dstAddr;
-            qDebug() << "pFrontSocket" << dstAddr;
+//            qDebug() << "pFrontSocket" << dstAddr;
             // ·â×°ÐÅ·â
             ZMDUtils::sendmore(&pBackSocket, dstAddr);
             ZMDUtils::sendmore(&pBackSocket, "");
@@ -178,7 +178,7 @@ void MainWindow::createRouterProxy()
         if (nLastWorkersCnt != sWorkersList.count())
         {
             nLastWorkersCnt = sWorkersList.count();
-            qDebug() << sWorkersList;
+//            qDebug() << sWorkersList;
         }
     }
 

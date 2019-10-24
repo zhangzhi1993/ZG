@@ -3,6 +3,7 @@
 
 #include <QMainWindow>
 #include <QQueue>
+#include "ZMDUtils.h"
 
 class QPushButton;
 class QUdpSocket;
@@ -23,6 +24,9 @@ public:
 public slots:
     void read_msg();
     void createClient();
+
+private:
+    void reSendInfo(zmq::socket_t *socket, const QMap<int, MTMessage> &lstTasks, int revNo);
 
 private:
     Ui::MainWindow *ui;
