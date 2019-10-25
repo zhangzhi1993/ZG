@@ -200,7 +200,7 @@ void MainWindow::createWorker()
                                     QString("send queryInfo to %1 from %2 for %3")
                                     .arg(ZMDUtils::lastAddr(srcAddr)).arg(ZMDUtils::lastAddr(uUID)).arg(sSrcInfoSeq).toLocal8Bit()};
                 bRes = bRes && ZMDUtils::sendMsg(&sckConsumer, msSend);
-//                qDebug() << QStringLiteral("发出询问") << ZMDCommon::lastAddr(uUID) << ZMDCommon::lastAddr(srcAddr) << mtMsg.info << bRes;
+                qDebug() << QStringLiteral("发出询问") << ZMDUtils::lastAddr(uUID) << ZMDUtils::lastAddr(srcAddr) << mtMsg.info << bRes;
                 nCredit--;
             }
 
