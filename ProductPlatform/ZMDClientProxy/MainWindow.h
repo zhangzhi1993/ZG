@@ -27,7 +27,7 @@ private slots:
     void doBroadCast(QList<int> sPortUDPBroadCasts);
 
 private:
-    void reOrgSendQQueue(QQueue<MTMessage> &lstTasks, const QMap<int, MTMessage> &mapTasks);
+    void reOrgSendQQueue(QQueue<MTMessage> &lstTasks, const QMap<QString, QPair<QTime, MTMessage> > &mapTasks);
 
 private:
     Ui::MainWindow *ui;

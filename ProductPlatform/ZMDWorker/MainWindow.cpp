@@ -107,11 +107,17 @@ void MainWindow::createWorker()
 
         QString uUID = QUuid::createUuid().toString();
         std::string sUID = uUID.toStdString();
-        qDebug() << "createWorker" << uUID;
+        QString huUID = QUuid::createUuid().toString();
+        std::string hsUID = huUID.toStdString();
+        qDebug() << "createWorker" << uUID << huUID;
 
         // 任务处理器
         zmq::socket_t sckConsumer (context, ZMQ_DEALER);
         sckConsumer.setsockopt(ZMQ_IDENTITY, sUID.data(), sUID.size());
+
+        // 心跳检测器
+        zmq::socket_t sckHeart (context, ZMQ_DEALER);
+        sckHeart.setsockopt(ZMQ_IDENTITY, hsUID.data(), hsUID.size());
 
         QString sIP;
         while(true)
@@ -122,11 +128,17 @@ void MainWindow::createWorker()
                 return;
             }
             sIP = proxAddrs.dequeue();
-            bool bConn = ZMDUtils::tryConnect(&sckConsumer, QString("tcp://%1:%2").arg(sIP).arg(cPortServer_Proxy));
-            if (bConn)
+            bool bConn1 = ZMDUtils::tryConnect(&sckConsumer, QString("tcp://%1:%2").arg(sIP).arg(cPortServer_Proxy));
+            bool bConn2 = ZMDUtils::tryConnect(&sckHeart, QString("tcp://%1:%2").arg(sIP).arg(cPortServer_Proxy2));
+            if (bConn1 && bConn2)
             {
                 qDebug() << QStringLiteral("成功连接到代理 %1").arg(sIP);
                 break;
+            }
+            else
+            {
+                sckConsumer.disconnect(QString("tcp://%1:%2").arg(sIP).arg(cPortServer_Proxy).toStdString());
+                sckHeart.disconnect(QString("tcp://%1:%2").arg(sIP).arg(cPortServer_Proxy2).toStdString());
             }
         }
 
@@ -134,10 +146,11 @@ void MainWindow::createWorker()
 //        qDebug() << "createWorker" << uUID << ++nCnt;
 
         // 告诉代理已经准备好了
-        ZMDUtils::send(&sckConsumer, QString("%1%2%3").arg(c_Ready).arg(c_Separator).arg(sIP));
+        ZMDUtils::send(&sckConsumer, QString("%1%2%3").arg(c_Ready).arg(c_Separator).arg(huUID));
 
         zmq_pollitem_t items [] = {
-            { sckConsumer, 0, ZMQ_POLLIN, 0 }
+            { sckConsumer, 0, ZMQ_POLLIN, 0 },
+            { sckHeart, 0, ZMQ_POLLIN, 0 }
         };
 
         QTime nextRestart = QTime::currentTime().addMSecs(c_ExpiredLoop);
@@ -145,20 +158,22 @@ void MainWindow::createWorker()
         int nDecRetry = 0;
         while (true)
         {
-            zmq_poll (items, 1, c_DealerWorkerLoop);
+            zmq_poll (items, 2, c_DealerWorkerLoop);
             if (QTime::currentTime() >= nextRestart)
             {
-                ZMDUtils::send(&sckConsumer, QString("%1%2%3").arg(c_UnUsed).arg(c_Separator).arg(sIP));
+                ZMDUtils::send(&sckConsumer, QString("%1%2%3").arg(c_UnUsed).arg(c_Separator).arg(huUID));
                 nextRestart = QTime::currentTime().addMSecs(c_ExpiredLoop);
                 nDecRetry++;
                 if (nDecRetry >= c_Retry)
                 {
                     qDebug() << QStringLiteral("删除超时Worker") << uUID;
                     sckConsumer.disconnect(QString("tcp://%1:%2").arg(sIP).arg(cPortServer_Proxy).toStdString());
+                    sckHeart.disconnect(QString("tcp://%1:%2").arg(sIP).arg(cPortServer_Proxy2).toStdString());
                     bInWorking = false;
                     return;
                 }
             }
+            ZMDUtils::send(&sckConsumer, QString("%1%2%3").arg(c_HeartBit).arg(c_Separator).arg(huUID));
 
             if (items [0].revents & ZMQ_POLLIN)
             {
@@ -166,6 +181,7 @@ void MainWindow::createWorker()
                 if (c_Delete == sReady)
                 {
                     sckConsumer.disconnect(QString("tcp://%1:%2").arg(sIP).arg(cPortServer_Proxy).toStdString());
+                    sckHeart.disconnect(QString("tcp://%1:%2").arg(sIP).arg(cPortServer_Proxy2).toStdString());
                     bInWorking = false;
                     return;
                 }
@@ -176,15 +192,35 @@ void MainWindow::createWorker()
                     break;
                 }
             }
+            if (items [1].revents & ZMQ_POLLIN)
+            {
+                QString sReady = ZMDUtils::resv(&sckHeart);
+                qDebug() << sReady;
+                if (c_HeartBit == sReady)
+                {
+                    nDecRetry = 0;
+                }
+            }
         }
 
-        qDebug() << QStringLiteral("接收任务") << mtMsg.toString();
+        QString sSrcInfoSeq;
+        if (mtMsg.infType == infString)
+        {
+            qDebug() << QStringLiteral("接收任务") << mtMsg.toString();
+            sSrcInfoSeq = QString(mtMsg.info).split(" ").last(); //记录测试client的任务序号
+        }
+        else
+        {
+            qDebug() << QStringLiteral("接收任务") << QTime::currentTime().toString();
+            ZMDUtils::writeFileString("123.rar", mtMsg.info);
+            sSrcInfoSeq = "12"; //记录测试client的任务序号
+        }
         QString srcAddr = mtMsg.srcAddr;
 
         int nSleep = qrand() % 100;
         Sleep(nSleep); // 处理任务
 
-        QString sSrcInfoSeq = QString(mtMsg.info).split(" ").last(); //记录测试client的任务序号
+
 
         // 发送询问消息
         int nAimSum = mtMsg.total;
@@ -200,7 +236,7 @@ void MainWindow::createWorker()
                                     QString("send queryInfo to %1 from %2 for %3")
                                     .arg(ZMDUtils::lastAddr(srcAddr)).arg(ZMDUtils::lastAddr(uUID)).arg(sSrcInfoSeq).toLocal8Bit()};
                 bRes = bRes && ZMDUtils::sendMsg(&sckConsumer, msSend);
-                qDebug() << QStringLiteral("发出询问") << ZMDUtils::lastAddr(uUID) << ZMDUtils::lastAddr(srcAddr) << mtMsg.info << bRes;
+                qDebug() << QStringLiteral("发出询问") << ZMDUtils::lastAddr(uUID) << ZMDUtils::lastAddr(srcAddr) /*<< mtMsg.info */<< bRes;
                 nCredit--;
             }
 
@@ -224,6 +260,7 @@ void MainWindow::createWorker()
         bRes = bRes && ZMDUtils::sendMsg(&sckConsumer, msSend);
         qDebug() << QStringLiteral("发送结果") << msSend.toString() << bRes;
         sckConsumer.close();
+        sckHeart.close();
         context.close();
     }
 

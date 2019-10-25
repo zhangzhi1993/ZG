@@ -20,13 +20,14 @@
 const int c_Retry = 10;
 const int c_BroadCastLoop = 1000;
 const int c_RouterProxyLoop = 5;
+const int c_TimeHeartBit = 1000 * 2;
 
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
     ui(new Ui::MainWindow),
     aButton(NULL),
     m_TaskCnt(10),
-    m_multiTaskCnt(2)
+    m_multiTaskCnt(1)
 {
     ui->setupUi(this);
     us = new QUdpSocket;
@@ -99,13 +100,17 @@ void MainWindow::createClient()
     zmq::context_t context(1);
     zmq::socket_t pBackSocket (context, ZMQ_ROUTER);
     pBackSocket.bind(QString("tcp://*:%1").arg(cPortServer_Proxy).toStdString());//后端绑定;
+    zmq::socket_t pHeartSocket (context, ZMQ_ROUTER);
+    pHeartSocket.bind(QString("tcp://*:%1").arg(cPortServer_Proxy2).toStdString());//后端绑定;
     zmq_pollitem_t items [] = {
-        { pBackSocket, 0, ZMQ_POLLIN, 0 }
+        { pBackSocket, 0, ZMQ_POLLIN, 0 },
+        { pHeartSocket, 0, ZMQ_POLLIN, 0 }
     };
 
     // 任务集
     int nSendSeq = 0;
     QMap<int, MTMessage> mapTasks; //需要发送的任务
+    QMap<QString, QPair<QTime, MTMessage> > mapHearts; //已经发送的任务的上次心跳时间
     QQueue<MTMessage> lstTasks;
     // 能一次发送的消息
     for (int i = 0; i < m_TaskCnt-m_multiTaskCnt; i++)
@@ -117,17 +122,18 @@ void MainWindow::createClient()
         lstTasks.enqueue(msSend);
     }
     // 需要多次发送的消息：首先发送一条Head信息并接收返回信息来确定Worker的地址，然后对方通过Query来查询之后的信息
+    QByteArray sinfo;
     for (int i = 0; i < m_multiTaskCnt; i++)
     {
         nSendSeq++;
         int nChunckCnt = 10;
-        MTMessage msSend = {mtTask, uRID, nSendSeq, "", 0, nChunckCnt, 0, infString, QString("send work from %1 for info:%2")
-                            .arg(ZMDUtils::lastAddr(uUID)).arg(nSendSeq).toLocal8Bit()};
+        ZMDUtils::readFileString("MicrosoftOfficeProfessionalPlus2007.rar", sinfo);
+        MTMessage msSend = {mtTask, uRID, nSendSeq, "", 0, nChunckCnt, 0, infFile, sinfo};
         mapTasks.insert(nSendSeq, msSend);
         lstTasks.enqueue(msSend);
     }
 
-    qDebug() << QStringLiteral("开始寻找Worker处理任务");
+    qDebug() << QStringLiteral("开始寻找Worker处理任务") << QTime::currentTime().toString();
     // 信息交互
     QQueue<QString> sWorkersList;
     int nResultCnt = 0;
@@ -149,20 +155,35 @@ void MainWindow::createClient()
             // 第三帧是ready指令或空消息
             QString sInfo = ZMDUtils::resv(&pBackSocket);
             QString sReady = sInfo.split(c_Separator).first();
-            QString sIP = sInfo.split(c_Separator).last();
+            QString sHeartAddr = sInfo.split(c_Separator).last();
             if (sReady == c_Ready)
             {
                 sWorkersList.enqueue(srcAddr);
             }
+            else if (sReady == c_HeartBit)
+            {
+                if (mapHearts.contains(srcAddr))
+                {
+                    QPair<QTime, MTMessage> aHeart = mapHearts.value(srcAddr);
+                    aHeart.first = QTime::currentTime().addMSecs(c_TimeHeartBit);
+                    mapHearts.insert(srcAddr, aHeart);
+                }
+            }
             else if (sReady == c_UnUsed)
             {
-//                qDebug() << QStringLiteral("尝试删除超时Worker") << srcAddr;
+                qDebug() << QStringLiteral("尝试删除超时Worker") << srcAddr;
                 if (sWorkersList.removeOne(srcAddr)) //发送确认删除的信号
                 {
                     // 封装信封
                     ZMDUtils::sendmore(&pBackSocket, srcAddr);
                     ZMDUtils::send(&pBackSocket, c_Delete);
                 }
+                else
+                {
+                    ZMDUtils::sendmore(&pHeartSocket, sHeartAddr);
+                    ZMDUtils::send(&pHeartSocket, c_HeartBit);
+                }
+
             }
             else //转发后端到前端的消息
             {
@@ -176,7 +197,8 @@ void MainWindow::createClient()
                     {
                         qDebug() << QStringLiteral("接收结果") << ZMDUtils::lastAddr(uRID) << ZMDUtils::lastAddr(srcAddr) << mtMsg.info ;
                         mapTasks.remove(mtMsg.ackNo);
-                        reOrgSendQQueue(lstTasks, mapTasks);
+                        mapHearts.remove(mtMsg.srcAddr);
+                        reOrgSendQQueue(lstTasks, mapHearts);
                     }
                     break;
                 case mtQuery:
@@ -209,9 +231,10 @@ void MainWindow::createClient()
             ZMDUtils::sendmore(&pBackSocket, dstAddr);
             ZMDUtils::sendmore(&pBackSocket, "");
             ZMDUtils::sendMsg(&pBackSocket, msSend);
-            qDebug() << QStringLiteral("发送一个新任务给") << msSend.toString() ;
+            mapHearts.insert(dstAddr, qMakePair(QTime::currentTime().addMSecs(c_TimeHeartBit), msSend));
+            qDebug() << QStringLiteral("发送一个新任务给") << msSend.toString() << QTime::currentTime().toString();;
         }
-        if (nResultCnt == m_TaskCnt)
+        if (mapTasks.isEmpty())
         {
             qDebug() << QStringLiteral("完成运算");
             break;
@@ -220,15 +243,19 @@ void MainWindow::createClient()
 
     qDebug() << QStringLiteral("结束运算");
     pBackSocket.close();
+    pHeartSocket.close();
     context.close();
 }
 
-void MainWindow::reOrgSendQQueue(QQueue<MTMessage> &lstTasks, const QMap<int, MTMessage> &mapTasks)
+void MainWindow::reOrgSendQQueue(QQueue<MTMessage> &lstTasks, const QMap<QString, QPair<QTime, MTMessage> > &mapTasks)
 {
-    QList<int> mapKeys = mapTasks.keys();
+    QList<QString> mapKeys = mapTasks.keys();
     for (int i = 0; i < mapKeys.count(); i++)
     {
-        MTMessage msSend = mapTasks.value(mapKeys.at(i));
-        lstTasks.enqueue(msSend);
+        if (mapTasks.value(mapKeys.at(i)).first < QTime::currentTime())
+        {
+            qDebug() << QStringLiteral("超时任务") << mapKeys.at(i) << QTime::currentTime();
+            lstTasks.enqueue(mapTasks.value(mapKeys.at(i)).second);
+        }
     }
 }
