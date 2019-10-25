@@ -10,6 +10,7 @@ class ZMDCOMMONSHARED_EXPORT MTMessage
 {
 public:
     MSGTYPE mtType;
+    QString uUID;
     QString srcAddr;
     int synNo; //·¢³öµÄÐòºÅ
     QString dstAddr;
@@ -20,6 +21,8 @@ public:
     QByteArray info;
 
     QString toString();
+
+    bool operator ==(const MTMessage & right);
 };
 
 

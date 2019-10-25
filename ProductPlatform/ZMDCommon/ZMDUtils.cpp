@@ -26,6 +26,7 @@ QString ZMDUtils::resv(zmq::socket_t *socket)
 MTMessage ZMDUtils::resvMsg(zmq::socket_t *socket)
 {
     MSGTYPE mtType = (MSGTYPE)ZMDUtils::resv(socket).toInt();
+    QString sUUID = ZMDUtils::resv(socket);
     QString sSrcAddr = ZMDUtils::resv(socket);
     int nSyn = ZMDUtils::resv(socket).toInt();
     QString sdstAddr = ZMDUtils::resv(socket);
@@ -34,13 +35,14 @@ MTMessage ZMDUtils::resvMsg(zmq::socket_t *socket)
     int nSequence = ZMDUtils::resv(socket).toInt();
     INFOTYPE infType = (INFOTYPE)ZMDUtils::resv(socket).toInt();
     QByteArray sMsg = ZMDUtils::resvByteArr(socket);
-    MTMessage mtMsg = {mtType, sSrcAddr, nSyn, sdstAddr, nAck, nTotal, nSequence, infType, sMsg};
+    MTMessage mtMsg = {mtType, sUUID, sSrcAddr, nSyn, sdstAddr, nAck, nTotal, nSequence, infType, sMsg};
     return mtMsg;
 }
 
 bool ZMDUtils::sendMsg(zmq::socket_t *socket, MTMessage mtMsg)
 {
     bool bRes = ZMDUtils::sendmore(socket, QString::number(mtMsg.mtType));
+    bRes = bRes && ZMDUtils::sendmore(socket, mtMsg.uUID);
     bRes = bRes && ZMDUtils::sendmore(socket, mtMsg.srcAddr);
     bRes = bRes && ZMDUtils::sendmore(socket, QString::number(mtMsg.synNo));
     bRes = bRes && ZMDUtils::sendmore(socket, mtMsg.dstAddr);

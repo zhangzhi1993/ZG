@@ -116,7 +116,7 @@ void MainWindow::createClient()
     for (int i = 0; i < m_TaskCnt-m_multiTaskCnt; i++)
     {
         ++nSendSeq;
-        MTMessage msSend = {mtTask, uRID, nSendSeq, "", 0, 1, 0, infString, QString("send work from %1 for info:%2")
+        MTMessage msSend = {mtTask, QUuid::createUuid().toString(), uRID, nSendSeq, "", 0, 1, 0, infString, QString("send work from %1 for info:%2")
                             .arg(ZMDUtils::lastAddr(uUID)).arg(nSendSeq).toLocal8Bit()}; //注意这里的srcAddr传的是sckExchanger的sRID
         mapTasks.insert(nSendSeq, msSend);
         lstTasks.enqueue(msSend);
@@ -128,7 +128,7 @@ void MainWindow::createClient()
         nSendSeq++;
         int nChunckCnt = 10;
         ZMDUtils::readFileString("MicrosoftOfficeProfessionalPlus2007.rar", sinfo);
-        MTMessage msSend = {mtTask, uRID, nSendSeq, "", 0, nChunckCnt, 0, infFile, sinfo};
+        MTMessage msSend = {mtTask, QUuid::createUuid().toString(), uRID, nSendSeq, "", 0, nChunckCnt, 0, infFile, sinfo};
         mapTasks.insert(nSendSeq, msSend);
         lstTasks.enqueue(msSend);
     }
@@ -207,7 +207,7 @@ void MainWindow::createClient()
                         qDebug() << QStringLiteral("接收询问") << ZMDUtils::lastAddr(uRID) << ZMDUtils::lastAddr(srcAddr) << mtMsg.info << mtMsg.sequence;
                         int nSleep = qrand() % 100;
                         Sleep(nSleep); //!!!! 查询新的数据
-                        MTMessage msSend = {mtResult, uRID, nSendSeq, srcAddr, 0, mtMsg.total, mtMsg.sequence, infString,
+                        MTMessage msSend = {mtResult, QUuid::createUuid().toString(), uRID, nSendSeq, srcAddr, 0, mtMsg.total, mtMsg.sequence, infString,
                                             QString("send queryRes from %1 to %2 for info:%3_%4")
                                             .arg(ZMDUtils::lastAddr(uRID)).arg(ZMDUtils::lastAddr(srcAddr)).arg(nSendSeq)
                                             .arg(mtMsg.sequence).toLocal8Bit()};
@@ -255,7 +255,11 @@ void MainWindow::reOrgSendQQueue(QQueue<MTMessage> &lstTasks, const QMap<QString
         if (mapTasks.value(mapKeys.at(i)).first < QTime::currentTime())
         {
             qDebug() << QStringLiteral("超时任务") << mapKeys.at(i) << QTime::currentTime();
-            lstTasks.enqueue(mapTasks.value(mapKeys.at(i)).second);
+            if (!lstTasks.contains(mapTasks.value(mapKeys.at(i)).second))
+            {
+                lstTasks.enqueue(mapTasks.value(mapKeys.at(i)).second);
+            }
+
         }
     }
 }
