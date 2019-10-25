@@ -1,11 +1,11 @@
 TEMPLATE = subdirs
 
 SUBDIRS += \
-    ZeroMQDemo \
+#    ZeroMQDemo \
     ZMDCommon \
-    ZMDClient \
+#    ZMDClient \
     ZMDWorker \
-    ZMDProxy \
+#    ZMDProxy \
     ZMDClientProxy
 
 

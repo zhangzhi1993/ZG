@@ -168,10 +168,12 @@ void MainWindow::createClient()
                     aHeart.first = QTime::currentTime().addMSecs(c_TimeHeartBit);
                     mapHearts.insert(srcAddr, aHeart);
                 }
+                ZMDUtils::sendmore(&pHeartSocket, sHeartAddr);
+                ZMDUtils::send(&pHeartSocket, c_HeartBit);
             }
             else if (sReady == c_UnUsed)
             {
-                qDebug() << QStringLiteral("尝试删除超时Worker") << srcAddr;
+//                qDebug() << QStringLiteral("尝试删除超时Worker") << srcAddr;
                 if (sWorkersList.removeOne(srcAddr)) //发送确认删除的信号
                 {
                     // 封装信封
@@ -198,7 +200,6 @@ void MainWindow::createClient()
                         qDebug() << QStringLiteral("接收结果") << ZMDUtils::lastAddr(uRID) << ZMDUtils::lastAddr(srcAddr) << mtMsg.info ;
                         mapTasks.remove(mtMsg.ackNo);
                         mapHearts.remove(mtMsg.srcAddr);
-                        reOrgSendQQueue(lstTasks, mapHearts);
                     }
                     break;
                 case mtQuery:
@@ -239,6 +240,7 @@ void MainWindow::createClient()
             qDebug() << QStringLiteral("完成运算");
             break;
         }
+        reOrgSendQQueue(lstTasks, mapHearts);
     }
 
     qDebug() << QStringLiteral("结束运算");
@@ -247,17 +249,20 @@ void MainWindow::createClient()
     context.close();
 }
 
-void MainWindow::reOrgSendQQueue(QQueue<MTMessage> &lstTasks, const QMap<QString, QPair<QTime, MTMessage> > &mapTasks)
+void MainWindow::reOrgSendQQueue(QQueue<MTMessage> &lstTasks, QMap<QString, QPair<QTime, MTMessage> > &mapTasks)
 {
     QList<QString> mapKeys = mapTasks.keys();
     for (int i = 0; i < mapKeys.count(); i++)
     {
         if (mapTasks.value(mapKeys.at(i)).first < QTime::currentTime())
         {
-            qDebug() << QStringLiteral("超时任务") << mapKeys.at(i) << QTime::currentTime();
             if (!lstTasks.contains(mapTasks.value(mapKeys.at(i)).second))
             {
+                qDebug() << QStringLiteral("超时任务") << mapKeys.at(i) << QTime::currentTime();
                 lstTasks.enqueue(mapTasks.value(mapKeys.at(i)).second);
+                QPair<QTime, MTMessage> aHeart = mapTasks.value(mapKeys.at(i));
+                aHeart.first = QTime::currentTime().addMSecs(c_TimeHeartBit);
+                mapTasks.insert(mapKeys.at(i), aHeart);
             }
 
         }

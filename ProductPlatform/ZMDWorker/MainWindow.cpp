@@ -173,7 +173,6 @@ void MainWindow::createWorker()
                     return;
                 }
             }
-            ZMDUtils::send(&sckConsumer, QString("%1%2%3").arg(c_HeartBit).arg(c_Separator).arg(huUID));
 
             if (items [0].revents & ZMQ_POLLIN)
             {
@@ -220,37 +219,59 @@ void MainWindow::createWorker()
         int nSleep = qrand() % 100;
         Sleep(nSleep); // 处理任务
 
-
-
         // 发送询问消息
         int nAimSum = mtMsg.total;
         int nYetSum = 1;
         int nOffset = 1;
-        int nCredit = (nAimSum-1) > c_PipeLine ?  c_PipeLine : (nAimSum-1);
+        int nCredit = (nAimSum-1) > 0 ?  (nAimSum-1) : 0;
+        nextRestart = QTime::currentTime().addMSecs(c_ExpiredLoop);
+        nDecRetry = 0;
+        while (nCredit)
+        {
+            bool bRes = ZMDUtils::sendmore(&sckConsumer, ""); // 一个空帧，用于代理判断Worker的消息类型
+            MTMessage msSend = {mtQuery, QUuid::createUuid().toString(), uUID, 0, srcAddr, 0, mtMsg.total, nOffset++, infString,
+                                QString("send queryInfo to %1 from %2 for %3")
+                                .arg(ZMDUtils::lastAddr(srcAddr)).arg(ZMDUtils::lastAddr(uUID)).arg(sSrcInfoSeq).toLocal8Bit()};
+            bRes = bRes && ZMDUtils::sendMsg(&sckConsumer, msSend);
+            qDebug() << QStringLiteral("发出询问") << ZMDUtils::lastAddr(uUID) << ZMDUtils::lastAddr(srcAddr) /*<< mtMsg.info */<< bRes;
+            nCredit--;
+        }
         while (nYetSum < nAimSum)
         {
-            while (nCredit)
+            zmq_poll (items, 2, c_DealerWorkerLoop);
+            if (QTime::currentTime() >= nextRestart)
             {
-                bool bRes = ZMDUtils::sendmore(&sckConsumer, ""); // 一个空帧，用于代理判断Worker的消息类型
-                MTMessage msSend = {mtQuery, QUuid::createUuid().toString(), uUID, 0, srcAddr, 0, mtMsg.total, nOffset++, infString,
-                                    QString("send queryInfo to %1 from %2 for %3")
-                                    .arg(ZMDUtils::lastAddr(srcAddr)).arg(ZMDUtils::lastAddr(uUID)).arg(sSrcInfoSeq).toLocal8Bit()};
-                bRes = bRes && ZMDUtils::sendMsg(&sckConsumer, msSend);
-                qDebug() << QStringLiteral("发出询问") << ZMDUtils::lastAddr(uUID) << ZMDUtils::lastAddr(srcAddr) /*<< mtMsg.info */<< bRes;
-                nCredit--;
+                ZMDUtils::send(&sckConsumer, QString("%1%2%3").arg(c_HeartBit).arg(c_Separator).arg(huUID));
+                nextRestart = QTime::currentTime().addMSecs(c_ExpiredLoop);
+                nDecRetry++;
+                if (nDecRetry >= c_Retry)
+                {
+                    qDebug() << QStringLiteral("删除超时Worker") << uUID;
+                    sckConsumer.disconnect(QString("tcp://%1:%2").arg(sIP).arg(cPortServer_Proxy).toStdString());
+                    sckHeart.disconnect(QString("tcp://%1:%2").arg(sIP).arg(cPortServer_Proxy2).toStdString());
+                    bInWorking = false;
+                    return;
+                }
             }
 
-            if (nOffset < nAimSum)
+            if (items [0].revents & ZMQ_POLLIN)
             {
-                nCredit++;
+                //接收询问返回消息
+                ZMDUtils::resv(&sckConsumer); // 空帧
+                MTMessage msQuery = ZMDUtils::resvMsg(&sckConsumer);
+                srcAddr = msQuery.srcAddr;
+                nYetSum++;
+                qDebug() << QStringLiteral("返回询问") << ZMDUtils::lastAddr(msQuery.dstAddr) << ZMDUtils::lastAddr(msQuery.srcAddr) << msQuery.info;
             }
-
-            //接收询问返回消息
-            ZMDUtils::resv(&sckConsumer); // 空帧
-            MTMessage msQuery = ZMDUtils::resvMsg(&sckConsumer);
-            srcAddr = msQuery.srcAddr;
-            nYetSum++;
-            qDebug() << QStringLiteral("返回询问") << ZMDUtils::lastAddr(msQuery.dstAddr) << ZMDUtils::lastAddr(msQuery.srcAddr) << msQuery.info;
+            if (items [1].revents & ZMQ_POLLIN)
+            {
+                QString sReady = ZMDUtils::resv(&sckHeart);
+                qDebug() << sReady;
+                if (c_HeartBit == sReady)
+                {
+                    nDecRetry = 0;
+                }
+            }
         }
 
         // 发送处理结果
