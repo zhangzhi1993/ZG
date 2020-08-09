@@ -52,7 +52,7 @@ void MainWindow::doBroadCast(QList<int> sPortUDPBroadCasts)
             {
                 QString ba = QString("%1%2%3").arg(entry.ip().toString())
                         .arg(c_Separator).arg(QUuid::createUuid().toString());
-                qDebug() << ba << sPortUDPBroadCasts;
+//                qDebug() << ba << sPortUDPBroadCasts;
                 foreach (int nPortUDPBroadCast, sPortUDPBroadCasts) {
                     us->writeDatagram(ba.toStdString().data(), broadcastAddress, nPortUDPBroadCast);  // UDP 发送数据
                 }
@@ -114,8 +114,24 @@ void MainWindow::createRouterProxy()
             QString srcAddr = ZMDUtils::resv(&pBackSocket);
 
             // 第三帧是ready指令或空消息
-            QString sReady = ZMDUtils::resv(&pBackSocket);
-            if (sReady != c_Ready) //转发后端到前端的消息
+            QString sInfo = ZMDUtils::resv(&pBackSocket);
+            QString sReady = sInfo.split(c_Separator).first();
+            QString sIP = sInfo.split(c_Separator).last();
+            if (sReady == c_Ready)
+            {
+                sWorkersList.enqueue(srcAddr);
+            }
+            else if (sReady == c_UnUsed)
+            {
+//                qDebug() << QStringLiteral("尝试删除超时Worker") << srcAddr;
+                if (sWorkersList.removeOne(srcAddr)) //发送确认删除的信号
+                {
+                    // 封装信封
+                    ZMDUtils::sendmore(&pBackSocket, srcAddr);
+                    ZMDUtils::send(&pBackSocket, c_Delete);
+                }
+            }
+            else //转发后端到前端的消息
             {
                 MTMessage msResv = ZMDUtils::resvMsg(&pBackSocket);
                 QString dstAddr = msResv.dstAddr;
@@ -125,10 +141,6 @@ void MainWindow::createRouterProxy()
                 ZMDUtils::sendmore(&pFrontSocket1, dstAddr);
                 ZMDUtils::sendmore(&pFrontSocket1, "");
                 ZMDUtils::sendMsg(&pFrontSocket1, msResv);
-            }
-            else
-            {
-                sWorkersList.enqueue(srcAddr);
             }
         }
         if (items [1].revents & ZMQ_POLLIN) // 转发前端到后端的信息
@@ -143,6 +155,7 @@ void MainWindow::createRouterProxy()
             QString dstAddr = msResv.dstAddr;
             // 封装信封
             ZMDUtils::sendmore(&pBackSocket, dstAddr);
+            ZMDUtils::sendmore(&pBackSocket, "");
             ZMDUtils::sendMsg(&pBackSocket, msResv);
         }
         if (items [2].revents & ZMQ_POLLIN && !sWorkersList.isEmpty()) // 用于客户端发送任务
@@ -155,9 +168,10 @@ void MainWindow::createRouterProxy()
             MTMessage msResv = ZMDUtils::resvMsg(&pFrontSocket2);
             QString dstAddr = sWorkersList.dequeue();
             msResv.dstAddr = dstAddr;
-//            qDebug() << "pFrontSocket" << msResv.toString();
+//            qDebug() << "pFrontSocket" << dstAddr;
             // 封装信封
             ZMDUtils::sendmore(&pBackSocket, dstAddr);
+            ZMDUtils::sendmore(&pBackSocket, "");
             ZMDUtils::sendMsg(&pBackSocket, msResv);
         }
         if (nLastWorkersCnt != sWorkersList.count())

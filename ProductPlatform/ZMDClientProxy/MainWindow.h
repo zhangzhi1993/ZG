@@ -22,17 +22,17 @@ public:
     void setTaskCnt(int taskCnt, int multiTaskCnt);
 
 public slots:
-    void read_msg();
     void createClient();
+private slots:
+    void doBroadCast(QList<int> sPortUDPBroadCasts);
 
 private:
-    void reSendInfo(zmq::socket_t *socket, const QMap<int, MTMessage> &lstTasks, int revNo);
+    void reOrgSendQQueue(QQueue<MTMessage> &lstTasks, QMap<QString, QPair<QTime, MTMessage> > &mapTasks);
 
 private:
     Ui::MainWindow *ui;
     QUdpSocket *us;
     QPushButton *aButton;
-    QQueue<QString> proxAddrs;
     int m_TaskCnt;
     int m_multiTaskCnt;
 };

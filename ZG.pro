@@ -1,11 +1,12 @@
 TEMPLATE = subdirs
 
 SUBDIRS += \
-    ZeroMQDemo \
+#    ZeroMQDemo \
     ZMDCommon \
-    ZMDClient \
+#    ZMDClient \
     ZMDWorker \
-    ZMDProxy
+#    ZMDProxy \
+    ZMDClientProxy
 
 
 ZeroMQDemo.subdir = ProductPlatform/ZeroMQDemo
@@ -15,8 +16,11 @@ ZMDCommon.subdir = ProductPlatform/ZMDCommon
 ZMDClient.subdir = ProductPlatform/ZMDClient
 ZMDClient.depends = ZMDCommon
 
+ZMDClientProxy.subdir = ProductPlatform/ZMDClientProxy
+ZMDClientProxy.depends = ZMDCommon
+
 ZMDProxy.subdir = ProductPlatform/ZMDProxy
-ZMDClient.depends = ZMDCommon
+ZMDProxy.depends = ZMDCommon
 
 ZMDWorker.subdir = ProductPlatform/ZMDWorker
-ZMDClient.depends = ZMDCommon
+ZMDWorker.depends = ZMDCommon

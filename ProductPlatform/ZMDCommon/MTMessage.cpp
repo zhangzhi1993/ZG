@@ -22,6 +22,11 @@ QString MTMessage::toString()
     default:
         break;
     }
-    return QString("%1 %2 %3 %4").arg(sType).arg(ZMDUtils::lastAddr(srcAddr))
-            .arg(ZMDUtils::lastAddr(dstAddr)).arg(QString(info));
+    return QString("%1 %2 %3").arg(sType).arg(ZMDUtils::lastAddr(srcAddr))
+            .arg(ZMDUtils::lastAddr(dstAddr)) + (infType == infString ? QString(info) : "");
+}
+
+bool MTMessage::operator ==(const MTMessage &right)
+{
+    return right.uUID == this->uUID;
 }
