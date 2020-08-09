@@ -48,6 +48,14 @@ public:
     static void setHighWaterLevel(zmq::socket_t *socket, int highWaterLevel);
     static QByteArray resvByteArr(zmq::socket_t *socket);
     static bool sendByteArr(zmq::socket_t *socket, QByteArray msg);
+    static void createRouterProxy();
 };
 
+class CreateUtils
+{
+public:
+    static void createRouterProxy();
+    static void createClient(QString uUID, QString sIP, int nTaskCnt);
+    static void createWorker(QString uUID, QString sIP);
+};
 #endif // ZEROUTILS_H

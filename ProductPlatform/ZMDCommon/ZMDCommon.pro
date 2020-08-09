@@ -27,15 +27,8 @@ DEFINES += QT_DEPRECATED_WARNINGS
 QMAKE_CXXFLAGS_RELEASE += /NODEFAULTLIB:"libcmt.lib"
 QMAKE_LFLAGS_RELEASE += /DEBUG
 
-include($(GLDRS)/Glodon/shared/zeroMQ.pri)
-include($(GLDRS)/Glodon/shared/libevent.pri)
-include($(GLDRS)/Glodon/shared/GEPEngine.pri)
-include($(GLDRS)/Glodon/shared/GLDStaticLib.pri)
-include($(GLDRS)/Glodon/shared/GSPStaticLib.pri)
-include($(GLDRS)/Glodon/shared/VLD.pri)
-include($(GLDRS)/Glodon/shared/GSCRSARefGLDStaticLib.pri)
-include($(GLDRS)/Glodon/shared/QtitanRibbon.pri)
-include($(GLDRS)/Glodon/shared/GLDXLS.pri)
+include(../ThirdParty/zeroMQ.pri)
+include(../ThirdParty/libevent.pri)
 
 SOURCES += \
     ZMDConst.cpp \

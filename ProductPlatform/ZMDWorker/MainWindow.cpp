@@ -29,7 +29,7 @@ MainWindow::MainWindow(QWidget *parent) :
     bInWorking(false)
 {
     ui->setupUi(this);
-    us = new QUdpSocket;
+    us = new QUdpSocket(this);
     bool bConn = false;
     int nPortUDPBroadCast;
     foreach (nPortUDPBroadCast, cWorkerPortUDPBroadCasts) {
@@ -54,7 +54,7 @@ MainWindow::MainWindow(QWidget *parent) :
     this->setCentralWidget(centerWindow);
 
     QVBoxLayout *aLayout = new QVBoxLayout;
-    aButton = new QPushButton();
+    aButton = new QPushButton(this);
     aButton->setText(QStringLiteral("一个新任务"));
     aLayout->addWidget(aButton);
     centerWindow->setLayout(aLayout);
@@ -63,8 +63,6 @@ MainWindow::MainWindow(QWidget *parent) :
 MainWindow::~MainWindow()
 {
     delete ui;
-    delete us;
-    delete aButton;
 }
 
 void MainWindow::read_msg()

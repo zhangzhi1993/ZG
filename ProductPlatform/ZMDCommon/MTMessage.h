@@ -3,8 +3,7 @@
 #include <QObject>
 #include "zmq.hpp"
 #include "zmdcommon_global.h"
-enum MSGTYPE;
-enum INFOTYPE;
+#include "ZMDConst.h"
 
 class ZMDCOMMONSHARED_EXPORT MTMessage
 {

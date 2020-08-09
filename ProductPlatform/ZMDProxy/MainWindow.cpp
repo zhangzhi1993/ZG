@@ -25,15 +25,14 @@ MainWindow::MainWindow(QWidget *parent) :
     abutton(NULL)
 {
     ui->setupUi(this);
-    us = new QUdpSocket;
-    abutton = new QPushButton;
+    us = new QUdpSocket(this);
+    abutton = new QPushButton(this);
     this->setCentralWidget(abutton);
 }
 
 MainWindow::~MainWindow()
 {
     delete ui;
-    delete us;
 }
 
 void MainWindow::doBroadCast(QList<int> sPortUDPBroadCasts)

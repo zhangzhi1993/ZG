@@ -28,7 +28,7 @@ MainWindow::MainWindow(QWidget *parent) :
     m_multiTaskCnt(2)
 {
     ui->setupUi(this);
-    us = new QUdpSocket;
+    us = new QUdpSocket(this);
     bool bConn = false;
     int nPortUDPBroadCast;
     foreach (nPortUDPBroadCast, cClientPortUDPBroadCasts) {
@@ -53,7 +53,7 @@ MainWindow::MainWindow(QWidget *parent) :
     this->setCentralWidget(centerWindow);
 
     QVBoxLayout *aLayout = new QVBoxLayout;
-    aButton = new QPushButton();
+    aButton = new QPushButton(this);
     aButton->setText(QStringLiteral("一个新任务"));
     aLayout->addWidget(aButton);
     centerWindow->setLayout(aLayout);
@@ -63,8 +63,6 @@ MainWindow::MainWindow(QWidget *parent) :
 MainWindow::~MainWindow()
 {
     delete ui;
-    delete us;
-    delete aButton;
 }
 
 void MainWindow::setTaskCnt(int taskCnt, int multiTaskCnt)
